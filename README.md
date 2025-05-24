@@ -3,10 +3,10 @@ Disciplina: Linguagens Formais e Autômatos – 2025-1
 Instituição: [Nome da Instituição, se necessário]
 
 Autores:
-- Felipe Ujvari Gasparino de Sousa – 10418415
-- Gustavo Nascimento Siqueira – 1041XXXX
-- Thomaz – 1041XXXX
-- Vinicius – 1041XXXX
+- Felipe Ujvari Gasparino de Sousa - 10418415
+- Gustavo Nascimento Siqueira - 10419057
+- Thomaz de Souza Scopel - 10417183
+- Vinicius Cappatti - 10418266
 
 ------------------------------------------------------------
 📌 Objetivo do Projeto:
