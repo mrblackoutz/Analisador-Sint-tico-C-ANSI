@@ -20,12 +20,35 @@
  * Gramática:
  * E -> X $
  * X -> T K
- * K -> + T K | - T K | ε
+ * K -> + T K | - T K | 'e'
  * T -> F Z
- * Z -> * F Z | / F Z | ε
+ * Z -> * F Z | / F Z | 'e'
  * F -> ( X ) | N | - N
  * N -> [0-9] D
- * D -> [0-9] D | ε
+ * D -> [0-9] D | 'e'
+ * 
+ * 'e' é a palavra vazia
+ * 
+ * Conjuntos FIRST:
+ *
+ * FIRST(E) = { (, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, - }
+ * FIRST(X) = { (, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, - }
+ * FIRST(K) = { +, -, ε }
+ * FIRST(T) = { (, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, - }
+ * FIRST(Z) = { , /, ε }
+ * FIRST(F) = { (, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, - }
+ * FIRST(N) = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }
+ * FIRST(D) = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, ε }
+ * 
+ * Conjuntos FOLLOW:
+ * FOLLOW(E) = { $ }
+ * FOLLOW(X) = { $, ) }
+ * FOLLOW(K) = { $, ) }
+ * FOLLOW(T) = { $, ), +, - }
+ * FOLLOW(Z) = { $, ), +, - }
+ * FOLLOW(F) = { , /, $, ), +, - }
+ * FOLLOW(N) = { , /, $, ), +, -, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }
+ * FOLLOW(D) = { , /, $, ), +, -, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }
  */
 
 char lookahead;     // Variável global para o lookahead
@@ -57,8 +80,6 @@ void trataErro() {
     exit(1); // Encerra o programa em caso de erro grave
 }
 
-// Implementação das funções para cada não-terminal (análise sintática)
-
 /* E -> X $ */
 int E() {
     if (X()) {
@@ -79,13 +100,8 @@ int X() {
     return 0;
 }
 
-/* K -> + T K | - T K | ε */
+/* K -> + T K | - T K | 'e' */
 int K() {
-    // Salva o estado atual para possível backtrack (se necessário, embora não estritamente aqui)
-    // Para esta gramática, o FIRST/FOLLOW já nos guia.
-    int saved_pos = current_pos;
-    char saved_lookahead = lookahead;
-
     if (lookahead == '+') {
         if (match('+')) {
             if (T()) {
@@ -103,8 +119,8 @@ int K() {
             }
         }
     }
-    // K -> ε
-    // Se o lookahead não for nem '+' nem '-', então K pode ser epsilon.
+    // K -> 'e'
+    // Se o lookahead não for nem '+' nem '-', então K pode ser palavra vazia.
     // Isso é determinado pelo FOLLOW(K).
     // FOLLOW(K) = { $, ) }
     else if (lookahead == '$' || lookahead == ')') {
@@ -114,17 +130,12 @@ int K() {
     // Se chegou aqui, é um erro, pois o lookahead não corresponde a nenhum FIRST de K,
     // nem a um caractere no FOLLOW(K) que permitiria epsilon.
     // No entanto, para produções epsilon, o retorno 1 já cobre o caso.
-    // A lógica de "else return 0" deve ser mais cuidadosa para não "falhar" epsilon indevidamente.
     // Se nenhum dos casos anteriores (que consomem entrada) funcionou, e o lookahead está no FOLLOW(K),
     // significa que a produção epsilon foi usada.
-
-    // Se chegamos aqui e não retornamos 1, significa que o lookahead não é válido para K.
-    // A gramática tem produções epsilon condicionais, então o else final não deve ser um simples 'return 0'
-    // se o lookahead estiver no FOLLOW(K).
-    // A estrutura do parser preditivo impede o backtrack.
     // Se o lookahead não é '+', '-', '$' ou ')', então é um erro.
-    trataErro(); // Should not be reached if epsilon is handled correctly
-    return 0; // Should not be reached
+    
+    trataErro();    // Não deveria ser alcançado se usou a palavra vazia corretamente
+    return 0;       // Não deveria ser alcançado
 }
 
 /* T -> F Z */
@@ -137,7 +148,7 @@ int T() {
     return 0;
 }
 
-/* Z -> * F Z | / F Z | ε */
+/* Z -> * F Z | / F Z | 'e' */
 int Z() {
     int saved_pos = current_pos;
     char saved_lookahead = lookahead;
@@ -159,7 +170,7 @@ int Z() {
             }
         }
     }
-    // Z -> ε
+    // Z -> 'e'
     // Se o lookahead não for nem '*' nem '/', então Z pode ser epsilon.
     // Isso é determinado pelo FOLLOW(Z).
     // FOLLOW(Z) = { $, ), +, - }
@@ -199,10 +210,8 @@ int F() {
 int N() {
     if (isdigit(lookahead)) {
         // Se o lookahead for um dígito, o match é feito para o dígito
-        // Note: A função match foi projetada para um único terminal.
         // Precisamos verificar se o caractere atual é um dígito e então avançar.
-        char digit_char = lookahead; // Salva o dígito para verificar
-        if (digit_char >= '0' && digit_char <= '9') { // Verifica se é um dígito válido
+        if (lookahead >= '0' && lookahead <= '9') { // Verifica se é um dígito válido
              lookahead = input_string[++current_pos]; // Avança o lookahead
              if (D()) {
                  return 1;
@@ -212,30 +221,21 @@ int N() {
     return 0; // Se não for um dígito
 }
 
-/* D -> [0-9] D | ε */
+/* D -> [0-9] D | 'e' */
 int D() {
-    // Salva o estado atual para possível backtrack (se necessário)
-    int saved_pos = current_pos;
-    char saved_lookahead = lookahead;
-
     if (isdigit(lookahead)) {
         // Se o lookahead for um dígito, o match é feito para o dígito
-        char digit_char = lookahead;
-        if (digit_char >= '0' && digit_char <= '9') {
+        if (lookahead >= '0' && lookahead <= '9') {
              lookahead = input_string[++current_pos];
              if (D()) {
                  return 1;
              }
         }
     }
-    // D -> ε
+    // D -> 'e'
     // Se o lookahead não for um dígito, então D pode ser epsilon.
     // Isso é determinado pelo FOLLOW(D).
     // FOLLOW(D) = { *, /, $, ), +, -, 0-9 }
-    // O 0-9 no FOLLOW(D) é para casos como '123+...', onde o '+' segue '123'
-    // e '3' é o último dígito de 'D'. No nosso `isdigit(lookahead)` já pegamos os 0-9.
-    // O que nos importa é que o lookahead seja um dos símbolos do FOLLOW(D)
-    // e *não* um dígito para que a produção epsilon seja escolhida.
     else if (lookahead == '*' || lookahead == '/' || lookahead == '$' ||
              lookahead == ')' || lookahead == '+' || lookahead == '-') {
         return 1; // Produção epsilon
@@ -244,9 +244,8 @@ int D() {
     // Se chegou aqui, é um erro, pois o lookahead não corresponde a nenhum FIRST de D (dígito),
     // nem a um caractere no FOLLOW(D) que permitiria epsilon.
     trataErro();
-    return 0; // Should not be reached
+    return 0; // Não deve ser alcançado
 }
-
 
 int main() {
 
