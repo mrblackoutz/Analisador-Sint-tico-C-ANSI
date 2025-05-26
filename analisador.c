@@ -16,53 +16,13 @@
 
 #define MAX 1000
 
-/*
- * Gramática a ser reconhecida (usaremos E como símbolo inicial):
- *
- * E -> X $
- * 
- * X -> T K
- * 
- * K -> + T K 
- *    | - T K
- *    | ε    (palavra vazia)
- * 
- * T -> F Z
- * 
- * Z -> * F Z
- *    | / F Z
- *    | ε
- * 
- * F -> ( X )
- *    | - N
- *    | N
- * 
- * N -> [0-9] D
- * 
- * D -> [0-9] D
- *    | ε
- */
-
-// Variável global para armazenar o símbolo atual (lookahead).
 char lookahead;
 
-int match(char t, char palavra[], int *pos) {
-    if (lookahead == t) {
-        (*pos)++;
-        lookahead = palavra[*pos];
-        return 1;
-    }
-    return 0;
-}
-
-// --------------------------------------------------------------------
-// Tratamento de erro simples (pode ser melhorado para indicar posição).
-// --------------------------------------------------------------------
-void trataErro(const char *palavra, int pos) {
-    printf("\nERRO DE SINTAXE na posição %d", pos);
-    printf("\nCaractere inesperado: '%c'\n", palavra[pos]);
-}
-
+/*
+ * Assinaturas (mantidas conforme o exemplo do professor):
+ * As funções recebem o array de entrada 'palavra' e o índice '*pos'
+ * por referência, e devolvem 1 (sucesso) ou 0 (falha).
+ */
 int E(char palavra[], int *pos);
 int X(char palavra[], int *pos);
 int K(char palavra[], int *pos);
@@ -72,229 +32,172 @@ int F(char palavra[], int *pos);
 int N(char palavra[], int *pos);
 int D(char palavra[], int *pos);
 
-// --------------------------------------------------------------------
-// E -> X $
-// --------------------------------------------------------------------
+/*
+ * Função para exibir o contexto de erro,
+ * mostrando a expressão inteira e marcando a posição com um '^'.
+ */
+void imprimeContextoErro(const char *palavra, int pos) {
+    printf("\n  %s\n", palavra);
+    printf("  ");
+    for(int i = 0; i < pos; i++) {
+        printf(" ");
+    }
+    printf("^\n");
+}
+
+/*
+ * Função para sinalizar erro fatal.
+ * Imprime a posição, o caractere inesperado, o que se esperava e encerra o programa.
+ */
+void sinalizaErro(const char *palavra, int pos, const char *msgEsperado) {
+    printf("\nERRO DE SINTAXE na posição %d:", pos);
+    if (pos < (int)strlen(palavra)) {
+        printf("\nCaractere inesperado: '%c'", palavra[pos]);
+    } else {
+        printf("\nFim inesperado da expressão.");
+    }
+    if (msgEsperado != NULL && strlen(msgEsperado) > 0) {
+        printf("\nEsperava: %s", msgEsperado);
+    }
+    imprimeContextoErro(palavra, pos);
+    exit(1);
+}
+
+int match(char t, char palavra[], int *pos) {
+    if (lookahead == t) {
+        (*pos)++;
+        lookahead = palavra[*pos];
+        return 1;
+    } else {
+        char msg[100];
+        snprintf(msg, sizeof(msg), "'%c'", t);
+        sinalizaErro(palavra, *pos, msg);
+        return 0; // só chegaria aqui se não encerrasse no sinalizaErro
+    }
+}
+
+/*
+ * Gramática a ser reconhecida:
+ *
+ * E -> X $
+ * X -> T K
+ * K -> + T K | - T K | ε
+ * T -> F Z
+ * Z -> * F Z | / F Z | ε
+ * F -> ( X ) | - N | N
+ * N -> [0-9] D
+ * D -> [0-9] D | ε
+ */
+
+/* E -> X $ */
 int E(char palavra[], int *pos) {
-    // Tenta derivar X
-    if (!X(palavra, pos)) {
-        return 0;
-    }
-
-    // Tenta casar '$'
-    if (!match('$', palavra, pos)) {
-        return 0;
-    }
-
-    // Se chegou aqui, derivou com sucesso X e encontrou '$'
+    if (!X(palavra, pos)) return 0;
+    if (!match('$', palavra, pos)) return 0;
     return 1;
 }
 
-// --------------------------------------------------------------------
-// X -> T K
-// --------------------------------------------------------------------
+/* X -> T K */
 int X(char palavra[], int *pos) {
-    if (!T(palavra, pos)) {
-        return 0;
-    }
-    if (!K(palavra, pos)) { 
-        return 0;
-    }
+    if (!T(palavra, pos)) return 0;
+    if (!K(palavra, pos)) return 0;
     return 1;
 }
 
-// --------------------------------------------------------------------
-// K -> + T K
-//    | - T K
-//    | ε
-// --------------------------------------------------------------------
+/* K -> + T K | - T K | ε */
 int K(char palavra[], int *pos) {
-    // FIRST(K) = { '+', '-' } U {ε} 
-    // FOLLOW(K) = { '$', ')' } (pois K aparece após T, dentro de X -> T K)
-    //
-    // Verifica se o lookahead é '+' ou '-'
     if (lookahead == '+') {
-        if (!match('+', palavra, pos)) {
-            return 0;
-        }
-        if (!T(palavra, pos)) {
-            return 0;
-        }
-        if (!K(palavra, pos)) {
-            return 0;
-        }
+        if (!match('+', palavra, pos)) return 0;
+        if (!T(palavra, pos))         return 0;
+        if (!K(palavra, pos))         return 0;
         return 1;
     } else if (lookahead == '-') {
-        if (!match('-', palavra, pos)) {
-            return 0;
-        }
-        if (!T(palavra, pos)) {
-            return 0;
-        }
-        if (!K(palavra, pos)) {
-            return 0;
-        }
+        if (!match('-', palavra, pos)) return 0;
+        if (!T(palavra, pos))         return 0;
+        if (!K(palavra, pos))         return 0;
         return 1;
     }
-
-    // Caso não seja '+' nem '-', pode ser ε (nada). Então retornamos 1
-    // se o lookahead estiver em FOLLOW(K): { '$', ')' }.
+    // Caso não seja '+' nem '-', pode ser ε se lookahead ∈ FOLLOW(K) = { '$', ')' }.
     if (lookahead == '$' || lookahead == ')') {
-        // Produção epsilon
-        return 1;
+        return 1; // Produção ε
     }
-
-    // Caso contrário, erro de sintaxe
+    sinalizaErro(palavra, *pos, "'+', '-' ou fim de expressão ( ) ou $ )");
     return 0;
 }
 
-// --------------------------------------------------------------------
-// T -> F Z
-// --------------------------------------------------------------------
+/* T -> F Z */
 int T(char palavra[], int *pos) {
-    if (!F(palavra, pos)) {
-        return 0;
-    }
-    if (!Z(palavra, pos)) {
-        return 0;
-    }
+    if (!F(palavra, pos)) return 0;
+    if (!Z(palavra, pos)) return 0;
     return 1;
 }
 
-// --------------------------------------------------------------------
-// Z -> * F Z
-//    | / F Z
-//    | ε
-// --------------------------------------------------------------------
+/* Z -> * F Z | / F Z | ε */
 int Z(char palavra[], int *pos) {
-    // FIRST(Z) = { '*', '/' } U {ε}
-    // FOLLOW(Z) = { '$', ')', '+', '-' }
-    //
-    // Verifica se é '*' ou '/'
     if (lookahead == '*') {
-        if (!match('*', palavra, pos)) {
-            return 0;
-        }
-        if (!F(palavra, pos)) {
-            return 0;
-        }
-        if (!Z(palavra, pos)) {
-            return 0;
-        }
+        if (!match('*', palavra, pos)) return 0;
+        if (!F(palavra, pos))         return 0;
+        if (!Z(palavra, pos))         return 0;
         return 1;
     } else if (lookahead == '/') {
-        if (!match('/', palavra, pos)) {
-            return 0;
-        }
-        if (!F(palavra, pos)) {
-            return 0;
-        }
-        if (!Z(palavra, pos)) {
-            return 0;
-        }
+        if (!match('/', palavra, pos)) return 0;
+        if (!F(palavra, pos))         return 0;
+        if (!Z(palavra, pos))         return 0;
         return 1;
     }
-
-    // Se não é '*' nem '/', pode ser ε no FOLLOW(Z): { '$', ')', '+', '-' }
+    // Caso contrário, ε se lookahead ∈ FOLLOW(Z) = { '$', ')', '+', '-' }.
     if (lookahead == '$' || lookahead == ')' || lookahead == '+' || lookahead == '-') {
-        // Produção epsilon
-        return 1;
+        return 1; // ε
     }
-
+    sinalizaErro(palavra, *pos, "'*', '/' ou fim de termo ($, ), +, -)");
     return 0;
 }
 
-// --------------------------------------------------------------------
-// F -> ( X ) 
-//    | - N
-//    | N
-// --------------------------------------------------------------------
+/* F -> ( X ) | - N | N */
 int F(char palavra[], int *pos) {
     if (lookahead == '(') {
-        // F -> ( X )
-        if (!match('(', palavra, pos)) {
-            return 0;
-        }
-        if (!X(palavra, pos)) {
-            return 0;
-        }
-        if (!match(')', palavra, pos)) {
-            return 0;
-        }
+        if (!match('(', palavra, pos)) return 0;
+        if (!X(palavra, pos))         return 0;
+        if (!match(')', palavra, pos)) return 0;
         return 1;
-    } 
-    else if (lookahead == '-') {
-        // F -> - N
-        if (!match('-', palavra, pos)) {
-            return 0;
-        }
-        if (!N(palavra, pos)) {
-            return 0;
-        }
+    } else if (lookahead == '-') {
+        if (!match('-', palavra, pos)) return 0;
+        if (!N(palavra, pos))         return 0;
         return 1;
-    }
-    else {
-        // F -> N
-        if (isdigit(lookahead)) {
-            if (!N(palavra, pos)) {
-                return 0;
-            }
-            return 1;
-        }
-        return 0;
+    } else {
+        if (!N(palavra, pos)) return 0;
+        return 1;
     }
 }
 
-// --------------------------------------------------------------------
-// N -> [0-9] D
-// --------------------------------------------------------------------
+/* N -> [0-9] D */
 int N(char palavra[], int *pos) {
     if (isdigit(lookahead)) {
-        // Casa um dígito
-        if (!match(lookahead, palavra, pos)) {
-            return 0;
-        }
+        // match(lookahead, ...) para casar o dígito atual
+        if (!match(lookahead, palavra, pos)) return 0;
         // Em seguida, chama D
-        if (!D(palavra, pos)) {
-            return 0;
-        }
+        if (!D(palavra, pos)) return 0;
         return 1;
     }
+    sinalizaErro(palavra, *pos, "dígito [0-9]");
     return 0;
 }
 
-// --------------------------------------------------------------------
-// D -> [0-9] D
-//    | ε
-// --------------------------------------------------------------------
+/* D -> [0-9] D | ε */
 int D(char palavra[], int *pos) {
-    // FIRST(D) = { [0-9], ε }
-    // FOLLOW(D) = { '*', '/', '$', ')', '+', '-' }
-    //
     if (isdigit(lookahead)) {
-        // Casa o dígito
-        if (!match(lookahead, palavra, pos)) {
-            return 0;
-        }
-        // Continua recursivamente
-        if (!D(palavra, pos)) {
-            return 0;
-        }
+        if (!match(lookahead, palavra, pos)) return 0;
+        if (!D(palavra, pos)) return 0;
         return 1;
     }
-
-    // Se não for dígito, pode ser ε se lookahead estiver em FOLLOW(D)
-    if (lookahead == '*' || lookahead == '/' || lookahead == '$' || 
+    // ε se lookahead ∈ FOLLOW(D) = { '*', '/', '$', ')', '+', '-' }
+    if (lookahead == '*' || lookahead == '/' || lookahead == '$' ||
         lookahead == ')' || lookahead == '+' || lookahead == '-') {
-        return 1; // Produção epsilon
+        return 1; 
     }
-
+    sinalizaErro(palavra, *pos, "dígito ou fim de número (ex: +, -, ), $, *, /)");
     return 0;
 }
 
-// --------------------------------------------------------------------
-// Função principal
-// --------------------------------------------------------------------
 int main() {
     FILE *arquivo = fopen("entrada.txt", "r");
     if (!arquivo) {
@@ -310,35 +213,37 @@ int main() {
     }
     fclose(arquivo);
 
-    // Remover possível quebra de linha do final:
+    // Remove eventual quebra de linha do final
     size_t len = strlen(palavra);
     if (len > 0 && palavra[len - 1] == '\n') {
         palavra[len - 1] = '\0';
         len--;
     }
 
-    // Se não houver '$' no final, garantimos que tenha.
-    if (len > 0 && palavra[len - 1] != '$') {
-        palavra[len]   = '$';
-        palavra[len+1] = '\0';
+    // Se não terminar com '$', a expressão está incorreta 
+    if (len == 0 || palavra[len - 1] != '$') {
+        printf("ERRO: A expressão não termina com '$'.\n");
+        return 1;
     }
 
-    // Posição inicial do analisador
     int pos = 0;
-
-    // Inicializa o lookahead
     lookahead = palavra[pos];
 
     printf("Expressão a ser analisada: %s\n", palavra);
 
-    // Chama o símbolo inicial E
     if (E(palavra, &pos)) {
-        // Verifica se realmente consumiu tudo até o '$'
-        printf("\nExpressão reconhecida com sucesso!\n\n");
+        // Se consumiu tudo, pos deve estar em len
+        if (pos == (int)strlen(palavra)) {
+            printf("\nExpressão reconhecida com sucesso!\n\n");
+        } else {
+            // Algo sobrou após o $
+            printf("\nAtenção: Sobrou texto após o fim da expressão!\n");
+            printf("Pos = %d, Tamanho total = %lu.\n", pos, strlen(palavra));
+        }
     } else {
-        // Se E() retornar 0, pode ser que houve falha em algum match()
-        // ou o lookahead não ficou em '$' no final.
-        trataErro(palavra, pos);
+        // Em caso de falha, provavelmente sinalizaErro já foi chamado,
+        // mas deixamos aqui só pra consistência.
+        sinalizaErro(palavra, pos, "Símbolo inicial E");
     }
 
     return 0;
