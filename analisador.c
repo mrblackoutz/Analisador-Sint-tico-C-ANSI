@@ -37,9 +37,10 @@ int D(char palavra[], int *pos);
  * mostrando a expressão inteira e marcando a posição com um '^'.
  */
 void imprimeContextoErro(const char *palavra, int pos) {
+    int i;
     printf("\n  %s\n", palavra);
     printf("  ");
-    for(int i = 0; i < pos; i++) {
+    for(i = 0; i < pos; i++) {
         printf(" ");
     }
     printf("^\n");
@@ -71,8 +72,7 @@ int match(char t, char palavra[], int *pos) {
     } else {
         char msg[100];
         snprintf(msg, sizeof(msg), "'%c'", t);
-        sinalizaErro(palavra, *pos, msg);
-        return 0; // só chegaria aqui se não encerrasse no sinalizaErro
+        return 0; /* só chegaria aqui se não encerrasse no sinalizaErro */
     }
 }
 
@@ -116,9 +116,9 @@ int K(char palavra[], int *pos) {
         if (!K(palavra, pos))         return 0;
         return 1;
     }
-    // Caso não seja '+' nem '-', pode ser ε se lookahead ∈ FOLLOW(K) = { '$', ')' }.
+    /* Caso não seja '+' nem '-', pode ser ε se lookahead ∈ FOLLOW(K) = { '$', ')' }. */
     if (lookahead == '$' || lookahead == ')') {
-        return 1; // Produção ε
+        return 1; /* Produção ε */
     }
     sinalizaErro(palavra, *pos, "'+', '-' ou fim de expressão ( ) ou $ )");
     return 0;
@@ -144,9 +144,9 @@ int Z(char palavra[], int *pos) {
         if (!Z(palavra, pos))         return 0;
         return 1;
     }
-    // Caso contrário, ε se lookahead ∈ FOLLOW(Z) = { '$', ')', '+', '-' }.
+    /* Caso contrário, ε se lookahead ∈ FOLLOW(Z) = { '$', ')', '+', '-' }. */
     if (lookahead == '$' || lookahead == ')' || lookahead == '+' || lookahead == '-') {
-        return 1; // ε
+        return 1; /* ε */
     }
     sinalizaErro(palavra, *pos, "'*', '/' ou fim de termo ($, ), +, -)");
     return 0;
@@ -172,9 +172,9 @@ int F(char palavra[], int *pos) {
 /* N -> [0-9] D */
 int N(char palavra[], int *pos) {
     if (isdigit(lookahead)) {
-        // match(lookahead, ...) para casar o dígito atual
+        /* match(lookahead, ...) para casar o dígito atual */
         if (!match(lookahead, palavra, pos)) return 0;
-        // Em seguida, chama D
+        /* Em seguida, chama D */
         if (!D(palavra, pos)) return 0;
         return 1;
     }
@@ -189,7 +189,7 @@ int D(char palavra[], int *pos) {
         if (!D(palavra, pos)) return 0;
         return 1;
     }
-    // ε se lookahead ∈ FOLLOW(D) = { '*', '/', '$', ')', '+', '-' }
+    /* ε se lookahead ∈ FOLLOW(D) = { '*', '/', '$', ')', '+', '-' } */
     if (lookahead == '*' || lookahead == '/' || lookahead == '$' ||
         lookahead == ')' || lookahead == '+' || lookahead == '-') {
         return 1; 
@@ -213,14 +213,14 @@ int main() {
     }
     fclose(arquivo);
 
-    // Remove eventual quebra de linha do final
+    /* Remove eventual quebra de linha do final */
     size_t len = strlen(palavra);
     if (len > 0 && palavra[len - 1] == '\n') {
         palavra[len - 1] = '\0';
         len--;
     }
 
-    // Se não terminar com '$', a expressão está incorreta 
+    /* Se não terminar com '$', a expressão está incorreta  */
     if (len == 0 || palavra[len - 1] != '$') {
         printf("ERRO: A expressão não termina com '$'.\n");
         return 1;
@@ -232,17 +232,17 @@ int main() {
     printf("Expressão a ser analisada: %s\n", palavra);
 
     if (E(palavra, &pos)) {
-        // Se consumiu tudo, pos deve estar em len
+        /* Se consumiu tudo, pos deve estar em len */
         if (pos == (int)strlen(palavra)) {
             printf("\nExpressão reconhecida com sucesso!\n\n");
         } else {
-            // Algo sobrou após o $
+            /* Algo sobrou após o $ */
             printf("\nAtenção: Sobrou texto após o fim da expressão!\n");
             printf("Pos = %d, Tamanho total = %lu.\n", pos, strlen(palavra));
         }
     } else {
-        // Em caso de falha, provavelmente sinalizaErro já foi chamado,
-        // mas deixamos aqui só pra consistência.
+        /* Em caso de falha, provavelmente sinalizaErro já foi chamado, */
+        /* mas deixamos aqui só pra consistência. */
         sinalizaErro(palavra, pos, "Símbolo inicial E");
     }
 
